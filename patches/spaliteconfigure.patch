@@ -1,0 +1,38 @@
+--- /Users/ics/Downloads/libspatialite-5.0.1 2/configure	2021-02-07 17:53:46.000000000 +0200
++++ spatialite/configure	2022-05-05 15:33:59.000000000 +0300
+@@ -9532,7 +9532,7 @@
+       # if running on 10.5 or later, the deployment target defaults
+       # to the OS version, if on x86, and 10.4, the deployment
+       # target defaults to 10.4. Don't you love it?
+-      case ${MACOSX_DEPLOYMENT_TARGET-10.0},$host in
++      case ${MACOSX_DEPLOYMENT_TARGET-10.10},$host in
+ 	10.0,*86*-darwin8*|10.0,*-darwin[91]*)
+ 	  _lt_dar_allow_undefined='${wl}-undefined ${wl}dynamic_lookup' ;;
+ 	10.[012]*)
+@@ -17344,7 +17344,7 @@
+   return 0;
+ }
+ _ACEOF
+-if ac_fn_c_try_link "$LINENO"; then :
++if true; then :
+   ac_cv_lib_sqlite3_sqlite3_prepare_v2=yes
+ else
+   ac_cv_lib_sqlite3_sqlite3_prepare_v2=no
+@@ -17546,7 +17546,7 @@
+   return 0;
+ }
+ _ACEOF
+-if ac_fn_c_try_link "$LINENO"; then :
++if true; then :
+   ac_cv_lib_sqlite3_sqlite3_rtree_query_callback=yes
+ else
+   ac_cv_lib_sqlite3_sqlite3_rtree_query_callback=no
+@@ -17662,7 +17662,7 @@
+ fi
+ { $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_proj_normalize_for_visualization" >&5
+ $as_echo "$ac_cv_search_proj_normalize_for_visualization" >&6; }
+-ac_res=$ac_cv_search_proj_normalize_for_visualization
++ac_res="-lproj"
+ if test "$ac_res" != no; then :
+   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+   proj_new_lib=1

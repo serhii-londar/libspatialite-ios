@@ -1,4 +1,5 @@
 XCODE_DEVELOPER = $(shell xcode-select --print-path)
+#used for selecting the sdk dir
 IOS_PLATFORM ?= iPhoneOS
 
 # Pick latest SDK in the directory
@@ -19,56 +20,55 @@ lib/libspatialite.a: build_arches
 	for file in build/arm64/lib/*.a; \
 		do name=`basename $$file .a`; \
 		lipo -create \
-			-arch armv7 build/armv7/lib/$$name.a \
-			-arch armv7s build/armv7s/lib/$$name.a \
 			-arch arm64 build/arm64/lib/$$name.a \
-			-arch i386 build/i386/lib/$$name.a \
 			-arch x86_64 build/x86_64/lib/$$name.a \
 			-output lib/$$name.a \
 		; \
 		done;
 
 # Build separate architectures
+# see https://www.innerfence.com/howto/apple-ios-devices-dates-versions-instruction-sets
 build_arches:
-	${MAKE} arch ARCH=armv7 IOS_PLATFORM=iPhoneOS HOST=arm-apple-darwin
-	${MAKE} arch ARCH=armv7s IOS_PLATFORM=iPhoneOS HOST=arm-apple-darwin
-	${MAKE} arch ARCH=arm64 IOS_PLATFORM=iPhoneOS HOST=arm-apple-darwin
-	${MAKE} arch ARCH=i386 IOS_PLATFORM=iPhoneSimulator HOST=i386-apple-darwin
 	${MAKE} arch ARCH=x86_64 IOS_PLATFORM=iPhoneSimulator HOST=x86_64-apple-darwin
-
+	${MAKE} arch ARCH=arm64 IOS_PLATFORM=iPhoneOS HOST=arm-apple-darwin
+	
 PREFIX = ${CURDIR}/build/${ARCH}
 LIBDIR = ${PREFIX}/lib
 BINDIR = ${PREFIX}/bin
 INCLUDEDIR = ${PREFIX}/include
+UTHASHDIR = ${CURDIR}/uthash
 
 CXX = ${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++
 CC = ${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang
-CFLAGS = -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -arch ${ARCH} -I${INCLUDEDIR} -miphoneos-version-min=7.0 -O3 -fembed-bitcode
-CXXFLAGS = -stdlib=libc++ -std=c++11 -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -arch ${ARCH} -I${INCLUDEDIR} -miphoneos-version-min=7.0 -O3 -fembed-bitcode
-LDFLAGS = -stdlib=libc++ -isysroot ${IOS_SDK} -L${LIBDIR} -L${IOS_SDK}/usr/lib -arch ${ARCH} -miphoneos-version-min=7.0
+CFLAGS =-isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -arch ${ARCH} -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=11.0 -Os -fembed-bitcode
+CXXFLAGS =-stdlib=libc++ -std=c++11 -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -arch ${ARCH} -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=11.0 -Os -fembed-bitcode
+LDFLAGS =-stdlib=libc++ -isysroot ${IOS_SDK} -L${LIBDIR}
+ -L${IOS_SDK}/usr/lib -arch ${ARCH} -mios-version-min=11.0
 
 arch: ${LIBDIR}/libspatialite.a
 
-${LIBDIR}/libspatialite.a: ${LIBDIR}/libproj.a ${LIBDIR}/libgeos.a ${LIBDIR}/rttopo.a ${CURDIR}/spatialite
+${LIBDIR}/libspatialite.a: ${LIBDIR}/libsqlite3.a ${LIBDIR}/libproj.a ${LIBDIR}/libgeos.a ${LIBDIR}/rttopo.a ${CURDIR}/spatialite
 	cd spatialite && env \
 	CXX=${CXX} \
 	CC=${CC} \
-	CFLAGS="${CFLAGS} -Wno-error=implicit-function-declaration" \
-	CXXFLAGS="${CXXFLAGS} -Wno-error=implicit-function-declaration" \
-	LDFLAGS="${LDFLAGS} -liconv -lgeos -lgeos_c -lc++" ./configure --host=${HOST} --enable-freexl=no --enable-rttopo=yes \
-	  --enable-libxml2=no --prefix=${PREFIX} --with-geosconfig=${BINDIR}/geos-config --disable-shared && make clean install-strip
+	CFLAGS="${CFLAGS}" \
+	CXXFLAGS="${CXXFLAGS}" \
+	LDFLAGS="${LDFLAGS} -liconv -lgeos -lgeos_c -lc++" ./configure --host=${HOST} --enable-freexl=no --enable-rttopo=yes --disable-examples \
+	  --enable-libxml2=no --disable-freexl --disable-minizip --prefix=${PREFIX} --with-geosconfig=${BINDIR}/geos-config --disable-shared \
+	  && make clean install-strip
 
 ${CURDIR}/spatialite:
-	curl http://www.gaia-gis.it/gaia-sins/libspatialite-sources/libspatialite-5.0.0-beta0.tar.gz > spatialite.tar.gz
+	curl http://www.gaia-gis.it/gaia-sins/libspatialite-sources/libspatialite-5.0.1.tar.gz > spatialite.tar.gz
 	tar -xzf spatialite.tar.gz
 	rm spatialite.tar.gz
-	mv libspatialite-5.0.0-beta0 spatialite
-	./update-spatialite
+	mv libspatialite-5.0.1 spatialite
+	./patch-spatialite
 	./change-deployment-target spatialite
 
 ${CURDIR}/rttopo:
 	git clone https://git.osgeo.org/gogs/rttopo/librttopo.git rttopo
 	cd rttopo && ./autogen.sh
+	./patch-rttopo
 	./change-deployment-target rttopo
 
 ${LIBDIR}/rttopo.a: ${CURDIR}/rttopo
@@ -83,34 +83,45 @@ ${LIBDIR}/rttopo.a: ${CURDIR}/rttopo
 
 
 ${LIBDIR}/libproj.a: ${CURDIR}/proj
-	cd proj && env \
-	CXX=${CXX} \
-	CC=${CC} \
-	CFLAGS="${CFLAGS}" \
-	CXXFLAGS="${CXXFLAGS}" \
-	LDFLAGS="${LDFLAGS}" ./configure --host=${HOST} --prefix=${PREFIX} --disable-shared && make clean install
+	cd proj && cmake \
+	-DCMAKE_CXX_COMPILER="${CXX}" \
+	-DCMAKE_C_COMPILER="${CC}" \
+	-DCMAKE_C_FLAGS="${CFLAGS}" \
+	-DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
+	-DCMAKE_INSTALL_PREFIX:PATH="${PREFIX}" \
+	-DCMAKE_OSX_ARCHITECTURES=${ARCH} \
+	-DCMAKE_OSX_SYSROOT:PATH="${IOS_SDK}" \
+	-DBUILD_SHARED_LIBS=OFF \
+	-DBUILD_APPS=OFF \
+	-DBUILD_TESTING=OFF \
+	-DENABLE_CURL=OFF \
+	-DENABLE_TIFF=OFF \
+	-DSQLITE3_INCLUDE_DIR=${INCLUDEDIR} \
+	-DSQLITE3_LIBRARY=${LIBDIR}/libsqlite3.a \
+	&& cmake --build . --target clean && cmake  --build . --config Release && cmake --install . --config Release
 
 ${CURDIR}/proj:
-	curl -L http://download.osgeo.org/proj/proj-4.9.3.tar.gz > proj.tar.gz
+	curl -L http://download.osgeo.org/proj/proj-9.0.0.tar.gz > proj.tar.gz
 	tar -xzf proj.tar.gz
 	rm proj.tar.gz
-	mv proj-4.9.3 proj
-	./change-deployment-target proj
+	mv proj-9.0.0 proj
 
 ${LIBDIR}/libgeos.a: ${CURDIR}/geos
-	cd geos && env \
-	CXX=${CXX} \
-	CC=${CC} \
-	CFLAGS="${CFLAGS}" \
-	CXXFLAGS="${CXXFLAGS}" \
-	LDFLAGS="${LDFLAGS}" ./configure --host=${HOST} --prefix=${PREFIX} --disable-shared && make clean install
+	cd geos && cmake \
+	-DCMAKE_CXX_COMPILER="${CXX}" \
+	-DCMAKE_C_COMPILER="${CC}" \
+	-DCMAKE_C_FLAGS="${CFLAGS}" \
+	-DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
+	-DCMAKE_INSTALL_PREFIX:PATH="${PREFIX}" \
+	-DCMAKE_OSX_ARCHITECTURES=${ARCH} \
+	-DCMAKE_OSX_SYSROOT:PATH="${IOS_SDK}" -DBUILD_GEOSOP:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF \
+	&& cmake --build . --target clean && cmake  --build . --config Release && cmake --install . --config Release
 
 ${CURDIR}/geos:
-	curl http://download.osgeo.org/geos/geos-3.6.1.tar.bz2 > geos.tar.bz2
+	curl http://download.osgeo.org/geos/geos-3.10.2.tar.bz2 > geos.tar.bz2
 	tar -xzf geos.tar.bz2
 	rm geos.tar.bz2
-	mv geos-3.6.1 geos
-	./change-deployment-target geos
+	mv geos-3.10.2 geos
 
 ${LIBDIR}/libsqlite3.a: ${CURDIR}/sqlite3
 	cd sqlite3 && env LIBTOOL=${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/libtool \
@@ -123,12 +134,12 @@ ${LIBDIR}/libsqlite3.a: ${CURDIR}/sqlite3
 	   --enable-dynamic-extensions --enable-static && make clean install-includeHEADERS install-libLTLIBRARIES
 
 ${CURDIR}/sqlite3:
-	curl https://www.sqlite.org/2018/sqlite-autoconf-3250200.tar.gz > sqlite3.tar.gz
+	curl https://www.sqlite.org/2022/sqlite-autoconf-3380300.tar.gz > sqlite3.tar.gz
 	tar xzvf sqlite3.tar.gz
 	rm sqlite3.tar.gz
-	mv sqlite-autoconf-3250200 sqlite3
+	mv sqlite-autoconf-3380300 sqlite3
 	./change-deployment-target sqlite3
 	touch sqlite3
 
 clean:
-	rm -rf build geos proj spatialite include lib rttopo
+	rm -rf build geos proj spatialite include lib rttopo sqlite3
