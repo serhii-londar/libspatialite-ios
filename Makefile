@@ -12,27 +12,29 @@ lib/libspatialite.a: build_arches
 	mkdir -p include
 
 	# Copy includes
-	cp -R build/arm64/include/geos include
-	cp -R build/arm64/include/spatialite include
-	cp -R build/arm64/include/*.h include
+	cp -R build/arm64-ios/include/geos include
+	cp -R build/arm64-ios/include/spatialite include
+	cp -R build/arm64-ios/include/*.h include
 
-	# Make fat libraries for all architectures
-	for file in build/arm64/lib/*.a; \
+	# Make fat libraries for Simulator architectures 
+	for file in build/arm64-sim/lib/*.a; \
 		do name=`basename $$file .a`; \
 		lipo -create \
-			-arch arm64 build/arm64/lib/$$name.a \
+			-arch arm64 build/arm64-sim/lib/$$name.a \
 			-arch x86_64 build/x86_64/lib/$$name.a \
 			-output lib/$$name.a \
 		; \
 		done;
-
+	./make-framework
+	
 # Build separate architectures
 # see https://www.innerfence.com/howto/apple-ios-devices-dates-versions-instruction-sets
 build_arches:
-	${MAKE} arch ARCH=x86_64 IOS_PLATFORM=iPhoneSimulator HOST=x86_64-apple-darwin
-	${MAKE} arch ARCH=arm64 IOS_PLATFORM=iPhoneOS HOST=arm-apple-darwin
+	${MAKE} arch ARCH=x86_64 IOS_PLATFORM=iPhoneSimulator HOST=x86_64-apple-darwin TARGET=x86_64-apple-ios8.0-simulator ARCHDIR=x86_64
+	${MAKE} arch ARCH=arm64 IOS_PLATFORM=iPhoneOS HOST=arm-apple-darwin TARGET=arm64-apple-ios8.0 ARCHDIR=arm64-ios
+	${MAKE} arch ARCH=arm64 IOS_PLATFORM=iPhoneSimulator HOST=arm-apple-darwin TARGET=arm64-apple-ios8.0-simulator ARCHDIR=arm64-sim
 	
-PREFIX = ${CURDIR}/build/${ARCH}
+PREFIX = ${CURDIR}/build/${ARCHDIR}
 LIBDIR = ${PREFIX}/lib
 BINDIR = ${PREFIX}/bin
 INCLUDEDIR = ${PREFIX}/include
@@ -40,10 +42,10 @@ UTHASHDIR = ${CURDIR}/uthash
 
 CXX = ${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++
 CC = ${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang
-CFLAGS =-isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -arch ${ARCH} -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=11.0 -Os -fembed-bitcode
-CXXFLAGS =-stdlib=libc++ -std=c++11 -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -arch ${ARCH} -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=11.0 -Os -fembed-bitcode
+CFLAGS =-target ${TARGET} -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=8.0 -Os -fembed-bitcode
+CXXFLAGS =-target ${TARGET} -stdlib=libc++ -std=c++11 -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=8.0 -Os -fembed-bitcode
 LDFLAGS =-stdlib=libc++ -isysroot ${IOS_SDK} -L${LIBDIR}
- -L${IOS_SDK}/usr/lib -arch ${ARCH} -mios-version-min=11.0
+ -L${IOS_SDK}/usr/lib -arch ${ARCH} -mios-version-min=8.0
 
 arch: ${LIBDIR}/libspatialite.a
 
@@ -142,4 +144,4 @@ ${CURDIR}/sqlite3:
 	touch sqlite3
 
 clean:
-	rm -rf build geos proj spatialite include lib rttopo sqlite3
+	rm -rf build geos proj spatialite include lib rttopo sqlite3 LibSpatialite.xcframework

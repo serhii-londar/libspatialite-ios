@@ -1,5 +1,5 @@
---- /Users/ics/github/spatialite5smellman/spatialite/src/gaiaaux/gg_utf8.c.orig	2022-04-28 16:46:43.000000000 +0300
-+++ /Users/ics/github/spatialite5smellman/spatialite/src/gaiaaux/gg_utf8.c	2022-04-28 16:44:32.000000000 +0300
+--- spatialite/src/gaiaaux/gg_utf8.c.orig	2022-04-28 16:46:43.000000000 +0300
++++ spatialite/src/gaiaaux/gg_utf8.c	2022-04-28 16:44:32.000000000 +0300
 @@ -75,27 +75,35 @@
  #else /* not MINGW32 - WIN32 */
  #if defined(__APPLE__) || defined(__ANDROID__)
