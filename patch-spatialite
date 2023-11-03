@@ -4,7 +4,3 @@ patch -Np0 < patches/spatialite.patch
 patch -Np0 < patches/gg_dxf.h.patch
 patch -Np0 < patches/gg_formats.h.patch
 patch -Np0 < patches/gg_structs.h.patch
-
-#for f in $(find spatialite -name Makefile.*); do
-#  gsed -i 's/ \-DLOADABLE_EXTENSION//g' $f
-#done

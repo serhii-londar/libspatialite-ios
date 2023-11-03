@@ -6,8 +6,7 @@ IOS_PLATFORM ?= iPhoneOS
 IOS_PLATFORM_DEVELOPER = ${XCODE_DEVELOPER}/Platforms/${IOS_PLATFORM}.platform/Developer
 IOS_SDK = ${IOS_PLATFORM_DEVELOPER}/SDKs/$(shell ls ${IOS_PLATFORM_DEVELOPER}/SDKs | sort -r | head -n1)
 
-all: lib/libspatialite.a
-lib/libspatialite.a: build_arches
+all: build_arches
 	mkdir -p lib
 	mkdir -p include
 
@@ -30,11 +29,15 @@ lib/libspatialite.a: build_arches
 # Build separate architectures
 # see https://www.innerfence.com/howto/apple-ios-devices-dates-versions-instruction-sets
 build_arches:
-	${MAKE} arch ARCH=x86_64 IOS_PLATFORM=iPhoneSimulator HOST=x86_64-apple-darwin TARGET=x86_64-apple-ios8.0-simulator ARCHDIR=x86_64
-	${MAKE} arch ARCH=arm64 IOS_PLATFORM=iPhoneOS HOST=arm-apple-darwin TARGET=arm64-apple-ios8.0 ARCHDIR=arm64-ios
-	${MAKE} arch ARCH=arm64 IOS_PLATFORM=iPhoneSimulator HOST=arm-apple-darwin TARGET=arm64-apple-ios8.0-simulator ARCHDIR=arm64-sim
-	
-PREFIX = ${CURDIR}/build/${ARCHDIR}
+	${MAKE} icu IOS_ARCH=x86_64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=x86_64-apple-darwin IOS_TARGET=x86_64-apple-ios8.0-simulator IOS_ARCH_DIR=x86_64
+	${MAKE} icu IOS_ARCH=arm64 IOS_PLATFORM=iPhoneOS IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0 IOS_ARCH_DIR=arm64-ios
+	${MAKE} icu IOS_ARCH=arm64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0-simulator IOS_ARCH_DIR=arm64-sim
+	${MAKE} icu IOS_ARCH=arm64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0-simulator IOS_ARCH_DIR=arm64-sim
+
+
+
+BUILD_DIR = ${CURDIR}/build
+PREFIX = ${BUILD_DIR}/${IOS_ARCH_DIR}
 LIBDIR = ${PREFIX}/lib
 BINDIR = ${PREFIX}/bin
 INCLUDEDIR = ${PREFIX}/include
@@ -42,12 +45,12 @@ UTHASHDIR = ${CURDIR}/uthash
 
 CXX = ${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++
 CC = ${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang
-CFLAGS =-target ${TARGET} -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=8.0 -Os -fembed-bitcode
-CXXFLAGS =-target ${TARGET} -stdlib=libc++ -std=c++11 -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=8.0 -Os -fembed-bitcode
-LDFLAGS =-stdlib=libc++ -isysroot ${IOS_SDK} -L${LIBDIR}
- -L${IOS_SDK}/usr/lib -arch ${ARCH} -mios-version-min=8.0
+CFLAGS =-target ${IOS_TARGET} -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=8.0 -Os -fembed-bitcode
+CXXFLAGS =-target ${IOS_TARGET} -stdlib=libc++ -std=c++11 -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=8.0 -Os -fembed-bitcode
+LDFLAGS =-stdlib=libc++ -isysroot ${IOS_SDK} -L${LIBDIR} -L${IOS_SDK}/usr/lib -arch ${IOS_ARCH} -mios-version-min=8.0
 
 arch: ${LIBDIR}/libspatialite.a
+icu: ${LIBDIR}/libicu.a
 
 ${LIBDIR}/libspatialite.a: ${LIBDIR}/libsqlite3.a ${LIBDIR}/libproj.a ${LIBDIR}/libgeos.a ${LIBDIR}/rttopo.a ${CURDIR}/spatialite
 	cd spatialite && env \
@@ -55,22 +58,31 @@ ${LIBDIR}/libspatialite.a: ${LIBDIR}/libsqlite3.a ${LIBDIR}/libproj.a ${LIBDIR}/
 	CC=${CC} \
 	CFLAGS="${CFLAGS}" \
 	CXXFLAGS="${CXXFLAGS}" \
-	LDFLAGS="${LDFLAGS} -liconv -lgeos -lgeos_c -lc++" ./configure --host=${HOST} --enable-freexl=no --enable-rttopo=yes --disable-examples \
-	  --enable-libxml2=no --disable-freexl --disable-minizip --prefix=${PREFIX} --with-geosconfig=${BINDIR}/geos-config --disable-shared \
-	  && make clean install-strip
+	LDFLAGS="${LDFLAGS} -liconv -lgeos -lgeos_c -lc++ -licudata -licui18n -licuuc -lsqlite3" \
+	./configure --host=${IOS_HOST} \
+	--prefix=${PREFIX} \
+	--with-geosconfig=${BINDIR}/geos-config \
+	--disable-freexl \
+    --disable-minizip \
+    --disable-gcov \
+    --disable-examples \
+    --disable-libxml2 \
+    --disable-shared \
+	&& make clean install-strip
 
 ${CURDIR}/spatialite:
-	curl http://www.gaia-gis.it/gaia-sins/libspatialite-sources/libspatialite-5.0.1.tar.gz > spatialite.tar.gz
+	curl http://www.gaia-gis.it/gaia-sins/libspatialite-sources/libspatialite-5.1.0.tar.gz > spatialite.tar.gz
 	tar -xzf spatialite.tar.gz
 	rm spatialite.tar.gz
-	mv libspatialite-5.0.1 spatialite
+	mv libspatialite-5.1.0 spatialite
 	./patch-spatialite
 	./change-deployment-target spatialite
 
 ${CURDIR}/rttopo:
-	git clone https://git.osgeo.org/gogs/rttopo/librttopo.git rttopo
-	cd rttopo && ./autogen.sh
-	./patch-rttopo
+	curl -L https://download.osgeo.org/librttopo/src/librttopo-1.1.0.tar.gz > rttopo.tar.gz
+	tar -xzf rttopo.tar.gz
+	rm rttopo.tar.gz
+	mv librttopo-1.1.0 rttopo
 	./change-deployment-target rttopo
 
 ${LIBDIR}/rttopo.a: ${CURDIR}/rttopo
@@ -80,21 +92,25 @@ ${LIBDIR}/rttopo.a: ${CURDIR}/rttopo
 	CFLAGS="${CFLAGS}" \
 	CXXFLAGS="${CXXFLAGS}" \
 	LDFLAGS="${LDFLAGS} -liconv -lgeos -lgeos_c -lc++" \
-	./configure --host=${HOST} --prefix=${PREFIX} \
-	    --disable-shared --with-geosconfig=${BINDIR}/geos-config && make clean install
+	./configure --host=${IOS_HOST} \
+	--prefix=${PREFIX} \
+	--disable-shared \
+	--with-geosconfig=${BINDIR}/geos-config \
+	&& make clean install
 
 
 ${LIBDIR}/libproj.a: ${CURDIR}/proj
 	cd proj && cmake \
+	-DCMAKE_SYSTEM_NAME=iOS \
 	-DCMAKE_CXX_COMPILER="${CXX}" \
 	-DCMAKE_C_COMPILER="${CC}" \
 	-DCMAKE_C_FLAGS="${CFLAGS}" \
 	-DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
 	-DCMAKE_INSTALL_PREFIX:PATH="${PREFIX}" \
-	-DCMAKE_OSX_ARCHITECTURES=${ARCH} \
+	-DCMAKE_OSX_ARCHITECTURES=${IOS_ARCH} \
 	-DCMAKE_OSX_SYSROOT:PATH="${IOS_SDK}" \
-	-DBUILD_SHARED_LIBS=OFF \
 	-DBUILD_APPS=OFF \
+	-DBUILD_SHARED_LIBS=OFF \
 	-DBUILD_TESTING=OFF \
 	-DENABLE_CURL=OFF \
 	-DENABLE_TIFF=OFF \
@@ -103,10 +119,10 @@ ${LIBDIR}/libproj.a: ${CURDIR}/proj
 	&& cmake --build . --target clean && cmake  --build . --config Release && cmake --install . --config Release
 
 ${CURDIR}/proj:
-	curl -L http://download.osgeo.org/proj/proj-9.0.0.tar.gz > proj.tar.gz
+	curl -L https://download.osgeo.org/proj/proj-9.2.1.tar.gz > proj.tar.gz
 	tar -xzf proj.tar.gz
 	rm proj.tar.gz
-	mv proj-9.0.0 proj
+	mv proj-9.2.1 proj
 
 ${LIBDIR}/libgeos.a: ${CURDIR}/geos
 	cd geos && cmake \
@@ -115,33 +131,89 @@ ${LIBDIR}/libgeos.a: ${CURDIR}/geos
 	-DCMAKE_C_FLAGS="${CFLAGS}" \
 	-DCMAKE_CXX_FLAGS="${CXXFLAGS}" \
 	-DCMAKE_INSTALL_PREFIX:PATH="${PREFIX}" \
-	-DCMAKE_OSX_ARCHITECTURES=${ARCH} \
+	-DCMAKE_OSX_ARCHITECTURES=${IOS_ARCH} \
 	-DCMAKE_OSX_SYSROOT:PATH="${IOS_SDK}" -DBUILD_GEOSOP:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=OFF -DBUILD_TESTING:BOOL=OFF \
 	&& cmake --build . --target clean && cmake  --build . --config Release && cmake --install . --config Release
 
 ${CURDIR}/geos:
-	curl http://download.osgeo.org/geos/geos-3.10.2.tar.bz2 > geos.tar.bz2
+	curl https://download.osgeo.org/geos/geos-3.12.0.tar.bz2 > geos.tar.bz2
 	tar -xzf geos.tar.bz2
 	rm geos.tar.bz2
-	mv geos-3.10.2 geos
+	mv geos-3.12.0 geos
 
-${LIBDIR}/libsqlite3.a: ${CURDIR}/sqlite3
-	cd sqlite3 && env LIBTOOL=${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/libtool \
+
+
+SQLITE_FLAGS=-DNDEBUG=1 \
+	-DHAVE_USLEEP=1 \
+	-DSQLITE_HAVE_ISNAN \
+	-DSQLITE_DEFAULT_JOURNAL_SIZE_LIMIT=1048576 \
+	-DSQLITE_THREADSAFE=2 \
+	-DSQLITE_TEMP_STORE=3 \
+	-DSQLITE_POWERSAFE_OVERWRITE=1 \
+	-DSQLITE_DEFAULT_FILE_FORMAT=4 \
+	-DSQLITE_DEFAULT_AUTOVACUUM=1 \
+	-DSQLITE_ENABLE_MEMORY_MANAGEMENT=1 \
+	-DSQLITE_ENABLE_FTS3 \
+	-DSQLITE_ENABLE_FTS4 \
+	-DSQLITE_ENABLE_JSON1 \
+	-DSQLITE_OMIT_BUILTIN_TEST \
+	-DSQLITE_OMIT_COMPILEOPTION_DIAGS \
+	-DSQLITE_DEFAULT_FILE_PERMISSIONS=0600 \
+	-DSQLITE_ENABLE_RTREE \
+	-DSQLITE_ENABLE_ICU \
+	-DSQLITE_ENABLE_LOAD_EXTENSION
+${LIBDIR}/libsqlite3.a: ${CURDIR}/sqlite3 ${LIBDIR}/libicu.a
+	cd sqlite3 && \
+	LIBTOOL=${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/libtool \
 	CXX=${CXX} \
 	CC=${CC} \
-	CFLAGS="${CFLAGS} -DSQLITE_THREADSAFE=1 -DSQLITE_ENABLE_RTREE=1 -DSQLITE_ENABLE_FTS3=1 -DSQLITE_ENABLE_FTS3_PARENTHESIS=1" \
-	CXXFLAGS="${CXXFLAGS} -DSQLITE_THREADSAFE=1 -DSQLITE_ENABLE_RTREE=1 -DSQLITE_ENABLE_FTS3=1 -DSQLITE_ENABLE_FTS3_PARENTHESIS=1" \
-	LDFLAGS="-Wl,-arch -Wl,${ARCH} -arch_only ${ARCH} ${LDFLAGS}" \
-	./configure --host=${HOST} --prefix=${PREFIX} --disable-shared \
-	   --enable-dynamic-extensions --enable-static && make clean install-includeHEADERS install-libLTLIBRARIES
+	CFLAGS="${CFLAGS}" \
+	CXXFLAGS="${CXXFLAGS}" \
+	LDFLAGS="-Wl,-arch -Wl,${IOS_ARCH} -arch_only ${IOS_ARCH} ${LDFLAGS} -licudata -licui18n -licuuc" \
+	${CC} -c sqlite3.c ${CFLAGS} ${SQLITE_FLAGS} -o "${LIBDIR}/libsqlite3.a"
+	cp -f -v "${CURDIR}/sqlite3/"*.h ${INCLUDEDIR}
 
 ${CURDIR}/sqlite3:
-	curl https://www.sqlite.org/2022/sqlite-autoconf-3380300.tar.gz > sqlite3.tar.gz
-	tar xzvf sqlite3.tar.gz
-	rm sqlite3.tar.gz
-	mv sqlite-autoconf-3380300 sqlite3
-	./change-deployment-target sqlite3
+	curl -L https://www.sqlite.org/2023/sqlite-amalgamation-3430200.zip -o sqlite3.zip
+	unzip sqlite3.zip
+	rm sqlite3.zip
+	mv sqlite-amalgamation-3430200 sqlite3
+	./patch-sqlite3
 	touch sqlite3
 
+${LIBDIR}/libicu.a: ${CURDIR}/icu
+	mkdir -p "${PREFIX}" && cd "${PREFIX}"
+	CXX=${CXX} \
+	CC=${CC} \
+	CFLAGS="${CFLAGS}" \
+	CXXFLAGS="${CXXFLAGS}" \
+	LDFLAGS="${LDFLAGS}" \
+	${CURDIR}/icu/source/./runConfigureICU MacOSX \
+	--host="arm-64-linux" \
+	--prefix="${PREFIX}" \
+	--with-cross-build="${CURDIR}/icu/build/intermediate_osx" \
+	--enable-static \
+	--enable-shared=no \
+	--enable-extras=no \
+	--enable-strict=no \
+	--enable-icuio=no \
+	--enable-layout=no \
+	--enable-layoutex=no \
+	--enable-tools=no \
+	--enable-tests=no \
+	--enable-samples=no \
+	--enable-dyload=no \
+	--with-data-packaging=archive
+	cd "${PREFIX}" && make clean install
+
+${CURDIR}/icu:
+	curl -L https://github.com/unicode-org/icu/releases/download/release-73-2/icu4c-73_2-src.tgz -o icu.tgz
+	tar -xzf icu.tgz
+	rm icu.tgz
+	ICU_INSTALL_DIR="${CURDIR}/icu" \
+	./build_icu_intermediate.sh 
+
+
+
 clean:
-	rm -rf build geos proj spatialite include lib rttopo sqlite3 LibSpatialite.xcframework
+	rm -rf build geos proj spatialite include lib rttopo sqlite3 LibSpatialite.xcframework icu
