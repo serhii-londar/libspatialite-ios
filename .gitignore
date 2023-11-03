@@ -24,3 +24,8 @@ proj
 spatialite
 sqlite3
 rttopo
+include
+include
+lib
+icu
+*.xcframework

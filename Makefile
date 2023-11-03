@@ -7,32 +7,15 @@ IOS_PLATFORM_DEVELOPER = ${XCODE_DEVELOPER}/Platforms/${IOS_PLATFORM}.platform/D
 IOS_SDK = ${IOS_PLATFORM_DEVELOPER}/SDKs/$(shell ls ${IOS_PLATFORM_DEVELOPER}/SDKs | sort -r | head -n1)
 
 all: build_arches
-	mkdir -p lib
-	mkdir -p include
-
-	# Copy includes
-	cp -R build/arm64-ios/include/geos include
-	cp -R build/arm64-ios/include/spatialite include
-	cp -R build/arm64-ios/include/*.h include
-
-	# Make fat libraries for Simulator architectures 
-	for file in build/arm64-sim/lib/*.a; \
-		do name=`basename $$file .a`; \
-		lipo -create \
-			-arch arm64 build/arm64-sim/lib/$$name.a \
-			-arch x86_64 build/x86_64/lib/$$name.a \
-			-output lib/$$name.a \
-		; \
-		done;
-	./make-framework
+	./run_make_framweork.sh
 	
 # Build separate architectures
 # see https://www.innerfence.com/howto/apple-ios-devices-dates-versions-instruction-sets
 build_arches:
-	${MAKE} icu IOS_ARCH=x86_64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=x86_64-apple-darwin IOS_TARGET=x86_64-apple-ios8.0-simulator IOS_ARCH_DIR=x86_64
-	${MAKE} icu IOS_ARCH=arm64 IOS_PLATFORM=iPhoneOS IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0 IOS_ARCH_DIR=arm64-ios
-	${MAKE} icu IOS_ARCH=arm64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0-simulator IOS_ARCH_DIR=arm64-sim
-	${MAKE} icu IOS_ARCH=arm64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0-simulator IOS_ARCH_DIR=arm64-sim
+	${MAKE} arch IOS_ARCH=x86_64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=x86_64-apple-darwin IOS_TARGET=x86_64-apple-ios8.0-simulator IOS_ARCH_DIR=x86_64
+	${MAKE} arch IOS_ARCH=arm64 IOS_PLATFORM=iPhoneOS IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0 IOS_ARCH_DIR=arm64-ios
+	${MAKE} arch IOS_ARCH=arm64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0-simulator IOS_ARCH_DIR=arm64-sim
+	${MAKE} arch IOS_ARCH=arm64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0-simulator IOS_ARCH_DIR=arm64-sim
 
 
 
@@ -50,7 +33,6 @@ CXXFLAGS =-target ${IOS_TARGET} -stdlib=libc++ -std=c++11 -isysroot ${IOS_SDK} -
 LDFLAGS =-stdlib=libc++ -isysroot ${IOS_SDK} -L${LIBDIR} -L${IOS_SDK}/usr/lib -arch ${IOS_ARCH} -mios-version-min=8.0
 
 arch: ${LIBDIR}/libspatialite.a
-icu: ${LIBDIR}/libicu.a
 
 ${LIBDIR}/libspatialite.a: ${LIBDIR}/libsqlite3.a ${LIBDIR}/libproj.a ${LIBDIR}/libgeos.a ${LIBDIR}/rttopo.a ${CURDIR}/spatialite
 	cd spatialite && env \
@@ -182,7 +164,7 @@ ${CURDIR}/sqlite3:
 	touch sqlite3
 
 ${LIBDIR}/libicu.a: ${CURDIR}/icu
-	mkdir -p "${PREFIX}" && cd "${PREFIX}"
+	mkdir -p "${CURDIR}/icu/build/${IOS_ARCH_DIR}" && cd "${CURDIR}/icu/build/${IOS_ARCH_DIR}" && \
 	CXX=${CXX} \
 	CC=${CC} \
 	CFLAGS="${CFLAGS}" \
@@ -203,8 +185,8 @@ ${LIBDIR}/libicu.a: ${CURDIR}/icu
 	--enable-tests=no \
 	--enable-samples=no \
 	--enable-dyload=no \
-	--with-data-packaging=archive
-	cd "${PREFIX}" && make clean install
+	--with-data-packaging=archive \
+	&& make clean install
 
 ${CURDIR}/icu:
 	curl -L https://github.com/unicode-org/icu/releases/download/release-73-2/icu4c-73_2-src.tgz -o icu.tgz
