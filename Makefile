@@ -6,8 +6,9 @@ IOS_PLATFORM ?= iPhoneOS
 IOS_PLATFORM_DEVELOPER = ${XCODE_DEVELOPER}/Platforms/${IOS_PLATFORM}.platform/Developer
 IOS_SDK = ${IOS_PLATFORM_DEVELOPER}/SDKs/$(shell ls ${IOS_PLATFORM_DEVELOPER}/SDKs | sort -r | head -n1)
 
+
 all: build_arches
-	./run_make_framweork.sh
+	${CURDIR}/./run_make_framework.sh
 	
 # Build separate architectures
 # see https://www.innerfence.com/howto/apple-ios-devices-dates-versions-instruction-sets
