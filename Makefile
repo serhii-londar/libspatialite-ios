@@ -13,9 +13,7 @@ all: build_arches
 # Build separate architectures
 # see https://www.innerfence.com/howto/apple-ios-devices-dates-versions-instruction-sets
 build_arches:
-	${MAKE} arch IOS_ARCH=x86_64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=x86_64-apple-darwin IOS_TARGET=x86_64-apple-ios8.0-simulator IOS_ARCH_DIR=x86_64
 	${MAKE} arch IOS_ARCH=arm64 IOS_PLATFORM=iPhoneOS IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0 IOS_ARCH_DIR=arm64-ios
-	${MAKE} arch IOS_ARCH=arm64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0-simulator IOS_ARCH_DIR=arm64-sim
 	${MAKE} arch IOS_ARCH=arm64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0-simulator IOS_ARCH_DIR=arm64-sim
 
 
