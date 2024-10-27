@@ -13,8 +13,8 @@ all: build_arches
 # Build separate architectures
 # see https://www.innerfence.com/howto/apple-ios-devices-dates-versions-instruction-sets
 build_arches:
-	${MAKE} arch IOS_ARCH=arm64 IOS_PLATFORM=iPhoneOS IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0 IOS_ARCH_DIR=arm64-ios
-	${MAKE} arch IOS_ARCH=arm64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios8.0-simulator IOS_ARCH_DIR=arm64-sim
+	${MAKE} arch IOS_ARCH=arm64 IOS_PLATFORM=iPhoneOS IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios13.0 IOS_ARCH_DIR=arm64-ios
+	${MAKE} arch IOS_ARCH=arm64 IOS_PLATFORM=iPhoneSimulator IOS_HOST=arm-apple-darwin IOS_TARGET=arm64-apple-ios13.0-simulator IOS_ARCH_DIR=arm64-sim
 
 
 
@@ -27,14 +27,17 @@ UTHASHDIR = ${CURDIR}/uthash
 
 CXX = ${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang++
 CC = ${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang
-CFLAGS =-target ${IOS_TARGET} -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=8.0 -Os -fembed-bitcode
-CXXFLAGS =-target ${IOS_TARGET} -stdlib=libc++ -std=c++11 -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=8.0 -Os -fembed-bitcode
-LDFLAGS =-stdlib=libc++ -isysroot ${IOS_SDK} -L${LIBDIR} -L${IOS_SDK}/usr/lib -arch ${IOS_ARCH} -mios-version-min=8.0
+CFLAGS =-target ${IOS_TARGET} -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=13.0 -Os -fembed-bitcode
+CXXFLAGS =-target ${IOS_TARGET} -stdlib=libc++ -std=c++11 -isysroot ${IOS_SDK} -I${IOS_SDK}/usr/include -I${INCLUDEDIR} -I${UTHASHDIR} -mios-version-min=13.0 -Os -fembed-bitcode
+LDFLAGS =-stdlib=libc++ -isysroot ${IOS_SDK} -L${LIBDIR} -L${IOS_SDK}/usr/lib -arch ${IOS_ARCH} -mios-version-min=13.0
 
 arch: ${LIBDIR}/libspatialite.a
 
 ${LIBDIR}/libspatialite.a: ${LIBDIR}/libsqlite3.a ${LIBDIR}/libproj.a ${LIBDIR}/libgeos.a ${LIBDIR}/rttopo.a ${CURDIR}/spatialite
 	cd spatialite && env \
+	PKG_CONFIG_PATH="${PREFIX}/lib/pkgconfig:${PKG_CONFIG_PATH}" \
+	SQLITE3_LIBS="-L${LIBDIR} -lsqlite3" \
+	SQLITE3_CFLAGS="-I${INCLUDEDIR}" \
 	CXX=${CXX} \
 	CC=${CC} \
 	CFLAGS="${CFLAGS}" \
@@ -143,6 +146,7 @@ SQLITE_FLAGS=-DNDEBUG=1 \
 	-DSQLITE_ENABLE_RTREE \
 	-DSQLITE_ENABLE_ICU \
 	-DSQLITE_ENABLE_LOAD_EXTENSION
+
 ${LIBDIR}/libsqlite3.a: ${CURDIR}/sqlite3 ${LIBDIR}/libicu.a
 	cd sqlite3 && \
 	LIBTOOL=${XCODE_DEVELOPER}/Toolchains/XcodeDefault.xctoolchain/usr/bin/libtool \
@@ -170,7 +174,7 @@ ${LIBDIR}/libicu.a: ${CURDIR}/icu
 	CXXFLAGS="${CXXFLAGS}" \
 	LDFLAGS="${LDFLAGS}" \
 	${CURDIR}/icu/source/./runConfigureICU MacOSX \
-	--host="arm-64-linux" \
+	--host=${IOS_HOST} \
 	--prefix="${PREFIX}" \
 	--with-cross-build="${CURDIR}/icu/build/intermediate_osx" \
 	--enable-static \
